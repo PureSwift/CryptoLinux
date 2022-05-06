@@ -5,6 +5,7 @@
 //  Created by Alsey Coleman Miller on 5/6/22.
 //
 
+import Foundation
 import SystemPackage
 import Socket
 
@@ -20,18 +21,27 @@ public struct CryptoLinux {
     
     // MARK: - Properties
     
-    public static var path: FilePath { "/proc/crypto" }
+    public static var path: String { "/proc/crypto" }
+    
+    internal let ciphers: [Cipher]
     
     // MARK: - Initializaton
     
     public init() throws {
-        let fileDescriptor = try FileDescriptor.open(Self.path, .readOnly)
-        try fileDescriptor.closeAfter {
+        let data = try Data(contentsOf: URL(fileURLWithPath: Self.path), options: [.mappedIfSafe])
+        guard let string = String(data: data, encoding: .utf8) else {
+            throw CocoaError(.fileReadCorruptFile)
         }
+        self.init(string)
     }
     
     internal init(_ driverList: String) {
-        
+        // parse ciphers
+        self.init([])
+    }
+    
+    internal init(_ ciphers: [Cipher]) {
+        self.ciphers = ciphers
     }
     
     // MARK: - Methods

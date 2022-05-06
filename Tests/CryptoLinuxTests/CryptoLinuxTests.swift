@@ -3,9 +3,16 @@ import XCTest
 
 final class CryptoLinuxTests: XCTestCase {
     
+    #if os(Linux)
+    func testLoadDrivers() throws {
+        let crypto = try CryptoLinux()
+        XCTAssert(crypto.ciphers.isEmpty == false)
+    }
+    #endif
+    
     func testDriverParsing() throws {
         let crypto = CryptoLinux(genericList)
-        
+        XCTAssert(crypto.ciphers.isEmpty == false)
     }
 }
 

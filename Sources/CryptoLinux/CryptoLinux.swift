@@ -27,17 +27,25 @@ public struct CryptoLinux {
     
     // MARK: - Initializaton
     
+    /// Reads the list of availble ciphers from `/proc/crypto`.
+    @available(macOS, unavailable)
     public init() throws {
         let data = try Data(contentsOf: URL(fileURLWithPath: Self.path), options: [.mappedIfSafe])
         guard let string = String(data: data, encoding: .utf8) else {
             throw CocoaError(.fileReadCorruptFile)
         }
-        self.init(string)
+        try self.init(string)
     }
     
-    internal init(_ driverList: String) {
+    internal init(
+        _ cipherList: String,
+        log: ((String) -> ())? = nil
+    ) throws {
         // parse ciphers
-        self.init([])
+        var decoder = CipherDecoder()
+        decoder.log = log
+        let ciphers = try decoder.decode(cipherList)
+        self.init(ciphers)
     }
     
     internal init(_ ciphers: [Cipher]) {
@@ -47,4 +55,53 @@ public struct CryptoLinux {
     // MARK: - Methods
     
     
+}
+
+// MARK: - Sequence
+
+extension CryptoLinux: Sequence {
+    
+    public typealias Element = Cipher
+    
+    public func makeIterator() -> IndexingIterator<CryptoLinux> {
+        return IndexingIterator(_elements: self)
+    }
+}
+
+// MARK: - Collection
+
+extension CryptoLinux: Collection {
+    
+    public var isEmpty: Bool {
+        ciphers.isEmpty
+    }
+    
+    public var count: Int {
+        ciphers.count
+    }
+    
+    public func index(after index: Int) -> Int {
+        index + 1
+    }
+    
+    public var startIndex: Int {
+        0
+    }
+    
+    public var endIndex: Int {
+        count
+    }
+}
+
+// MARK: - RandomAccessCollection
+
+extension CryptoLinux: RandomAccessCollection {
+    
+    public subscript (index: Int) -> Cipher {
+        ciphers[index]
+    }
+    
+    public subscript(bounds: Range<Int>) -> Slice<CryptoLinux> {
+        return Slice<CryptoLinux>(base: self, bounds: bounds)
+    }
 }

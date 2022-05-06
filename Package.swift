@@ -8,6 +8,12 @@ let libraryType: PackageDescription.Product.Library.LibraryType? = dynamicLibrar
 
 var package = Package(
     name: "CryptoLinux",
+    platforms: [
+        .macOS(.v10_15),
+        .iOS(.v13),
+        .watchOS(.v6),
+        .tvOS(.v13),
+    ],
     products: [
         .library(
             name: "CryptoLinux",
@@ -23,7 +29,9 @@ var package = Package(
     targets: [
         .target(
             name: "CryptoLinux",
-            dependencies: []
+            dependencies: [
+                "Socket"
+            ]
         ),
         .testTarget(
             name: "CryptoLinuxTests",

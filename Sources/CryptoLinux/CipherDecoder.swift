@@ -47,12 +47,12 @@ internal struct CipherDecoder {
         return try [T].init(from: decoder)
     }
     
-    static func decode(_ string: String) throws -> [[String: Substring]] {
-        let lines = string.split(separator: "\n")
+    static func decode(_ string: String) throws -> [[Substring: Substring]] {
+        let lines = string.split(separator: "\n", omittingEmptySubsequences: false)
         let entries = lines
             .filter { $0.isEmpty }
             .count + 1
-        var result = [[String: Substring]]()
+        var result = [[Substring: Substring]]()
         result.reserveCapacity(entries)
         result.append([:])
         var entryIndex = 0
@@ -62,12 +62,16 @@ internal struct CipherDecoder {
                 entryIndex += 1
             } else {
                 // parse key-value pair
-                let entryLines = line.split(separator: ":")
+                let entryLines = line.split(separator: ":", maxSplits: 2, omittingEmptySubsequences: false)
                 guard entryLines.count == 2 else {
                     throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: [], debugDescription: "Invalid key-value pair at line \(lineIndex)"))
                 }
-                let key = entryLines[0].replacingOccurrences(of: " ", with: "")
-                let value = entryLines[1]
+                var key = entryLines[0]
+                while key.last == " " {
+                    key.removeLast()
+                }
+                var value = entryLines[1]
+                value.removeFirst()
                 result[entryIndex][key] = value
             }
         }
@@ -164,7 +168,7 @@ internal extension CipherDecoder.Decoder {
     }
     
     /// Attempt to decode native value to expected type.
-    func unboxDecodable <T: Decodable> (_ container: [String: Substring], as type: T.Type) throws -> T {
+    func unboxDecodable <T: Decodable> (_ container: [Substring: Substring], as type: T.Type) throws -> T {
         // push container to stack and decode using Decodable implementation
         stack.push(.keyed(container))
         let decoded = try T(from: self)
@@ -231,8 +235,8 @@ internal extension CipherDecoder.Stack {
     
     enum Container {
         
-        case unkeyed([[String: Substring]])
-        case keyed([String: Substring])
+        case unkeyed([[Substring: Substring]])
+        case keyed([Substring: Substring])
         case single(Substring)
     }
 }
@@ -249,7 +253,7 @@ internal struct CipherKeyedDecodingContainer <K: CodingKey> : KeyedDecodingConta
     let decoder: CipherDecoder.Decoder
     
     /// A reference to the container we're reading from.
-    let container: [String: Substring]
+    let container: [Substring: Substring]
     
     /// The path of coding keys taken to get to this point in decoding.
     let codingPath: [CodingKey]
@@ -262,19 +266,19 @@ internal struct CipherKeyedDecodingContainer <K: CodingKey> : KeyedDecodingConta
     /// Initializes `self` by referencing the given decoder and container.
     init(
         referencing decoder: CipherDecoder.Decoder,
-        wrapping container: [String: Substring]
+        wrapping container: [Substring: Substring]
     ) {
         self.decoder = decoder
         self.container = container
         self.codingPath = decoder.codingPath
-        self.allKeys = container.keys.compactMap { Key(stringValue: $0) }
+        self.allKeys = container.keys.compactMap { Key(stringValue: String($0)) }
     }
     
     // MARK: KeyedDecodingContainerProtocol
     
     func contains(_ key: Key) -> Bool {
         self.decoder.log?("Check whether key \"\(key.stringValue)\" exists")
-        return container.keys.contains(key.stringValue)
+        return allKeys.contains { key.stringValue == $0.stringValue }
     }
     
     func decodeNil(forKey key: Key) throws -> Bool {
@@ -396,7 +400,10 @@ internal struct CipherKeyedDecodingContainer <K: CodingKey> : KeyedDecodingConta
     
     /// Access actual value
     private func value(for key: Key) throws -> Substring? {
-        return container[key.stringValue]
+        guard let key = container.keys.first(where: { $0.elementsEqual(key.stringValue) }) else {
+            return nil
+        }
+        return container[key]
     }
 }
 
@@ -504,7 +511,7 @@ internal struct CipherUnkeyedDecodingContainer: UnkeyedDecodingContainer {
     let decoder: CipherDecoder.Decoder
     
     /// A reference to the container we're reading from.
-    let container: [[String: Substring]]
+    let container: [[Substring: Substring]]
     
     /// The path of coding keys taken to get to this point in decoding.
     let codingPath: [CodingKey]
@@ -514,7 +521,7 @@ internal struct CipherUnkeyedDecodingContainer: UnkeyedDecodingContainer {
     // MARK: Initialization
     
     /// Initializes `self` by referencing the given decoder and container.
-    init(referencing decoder: CipherDecoder.Decoder, wrapping container: [[String: Substring]]) {
+    init(referencing decoder: CipherDecoder.Decoder, wrapping container: [[Substring: Substring]]) {
         
         self.decoder = decoder
         self.container = container

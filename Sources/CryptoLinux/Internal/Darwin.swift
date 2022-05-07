@@ -12,21 +12,42 @@ import Socket
 #if !os(Linux)
 #warning("This module will only run on Linux")
 
-public var AF_ALG: CInt { 38 }
-public var SOL_ALG: CInt { 279 }
-
 @usableFromInline
 internal func stub(function: StaticString = #function) -> Never {
     fatalError("\(function) not implemented. This code only runs on Linux.")
 }
 
+public var AF_ALG: CInt { 38 }
+public var SOL_ALG: CInt { 279 }
+
+/* Socket options */
+public var ALG_SET_KEY: CInt            { 1 }
+public var ALG_SET_IV: CInt             { 2 }
+public var ALG_SET_OP: CInt             { 3 }
+
+/* Operations */
+public var ALG_OP_DECRYPT: CInt         { 0 }
+public var ALG_OP_ENCRYPT: CInt         { 1 }
+
+public struct sockaddr_alg {
+    public var salg_family: UInt16
+    public var salg_type: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
+    public var salg_feat: UInt32
+    public var salg_mask: UInt32
+    public var salg_name: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+                           UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+                           UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+                           UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
+    public init() {
+        stub()
+    }
+}
+
 public extension SocketOptionLevel {
-    
     static var crypto: SocketOptionLevel { SocketOptionLevel(rawValue: SOL_ALG) }
 }
 
 public extension SocketAddressFamily {
-    
     static var crypto: SocketAddressFamily { SocketAddressFamily(rawValue: AF_ALG) }
 }
 

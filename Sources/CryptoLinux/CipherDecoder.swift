@@ -109,20 +109,27 @@ internal extension CipherDecoder {
         
         func container <Key: CodingKey> (keyedBy type: Key.Type) throws -> KeyedDecodingContainer<Key> {
             log?("Requested container keyed by \(type.sanitizedName) for path \"\(codingPath.path)\"")
-            fatalError()
+            guard case let .keyed(container) = stack.top else {
+                throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: codingPath, debugDescription: "Cannot get keyed decoding container, invalid top container \(stack.top)."))
+            }
+            let keyedContainer = CipherKeyedDecodingContainer<Key>(referencing: self, wrapping: container)
+            return KeyedDecodingContainer(keyedContainer)
         }
         
         func unkeyedContainer() throws -> UnkeyedDecodingContainer {
             log?("Requested unkeyed container for path \"\(codingPath.path)\"")
-            guard case let .unkeyed(container) = self.stack.top else {
-                throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: codingPath, debugDescription: "Expected keyed container."))
+            guard case let .unkeyed(container) = stack.top else {
+                throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: codingPath, debugDescription: "Cannot get unkeyed decoding container, invalid top container \(stack.top)."))
             }
             return CipherUnkeyedDecodingContainer(referencing: self, wrapping: container)
         }
         
         func singleValueContainer() throws -> SingleValueDecodingContainer {
             log?("Requested single value container for path \"\(codingPath.path)\"")
-            fatalError()
+            guard case let .single(container) = stack.top else {
+                throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: codingPath, debugDescription: "Cannot get single value decoding container, invalid top container \(stack.top)."))
+            }
+            return CipherSingleValueDecodingContainer(referencing: self, wrapping: container)
         }
     }
 }

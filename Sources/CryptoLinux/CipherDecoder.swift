@@ -590,33 +590,6 @@ internal struct CipherUnkeyedDecodingContainer: UnkeyedDecodingContainer {
     }
     
     mutating func superDecoder() throws -> Decoder {
-        /*
-        // set coding key context
-        self.decoder.codingPath.append(Index(intValue: currentIndex))
-        defer { self.decoder.codingPath.removeLast() }
-        
-        // log
-        self.decoder.log?("Requested super decoder for path \"\(self.decoder.codingPath.path)\"")
-        
-        // check for end of array
-        try assertNotEnd()
-        
-        // get item
-        let item = container[currentIndex]
-        
-        // increment counter
-        self.currentIndex += 1
-        
-        // create new decoder
-        let decoder = CipherDecoder.Decoder(
-            referencing: .item(item),
-            at: self.decoder.codingPath,
-            userInfo: self.decoder.userInfo,
-            log: self.decoder.log
-        )
-        
-        return decoder
-        */
         fatalError()
     }
     
@@ -641,7 +614,10 @@ internal extension CipherUnkeyedDecodingContainer {
         }
         
         public init?(stringValue: String) {
-            return nil
+            guard let index = Int(stringValue) else {
+                return nil
+            }
+            self.index = index
         }
         
         public var intValue: Int? {
@@ -649,7 +625,7 @@ internal extension CipherUnkeyedDecodingContainer {
         }
         
         public var stringValue: String {
-            return "\(index)"
+            return index.description
         }
     }
 }

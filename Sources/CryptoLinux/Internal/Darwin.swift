@@ -20,12 +20,12 @@ internal func stub(function: StaticString = #function) -> Never {
     fatalError("\(function) not implemented. This code only runs on Linux.")
 }
 
-internal extension SocketOptionLevel {
+public extension SocketOptionLevel {
     
     static var crypto: SocketOptionLevel { SocketOptionLevel(rawValue: SOL_ALG) }
 }
 
-internal extension SocketAddressFamily {
+public extension SocketAddressFamily {
     
     static var crypto: SocketAddressFamily { SocketAddressFamily(rawValue: AF_ALG) }
 }

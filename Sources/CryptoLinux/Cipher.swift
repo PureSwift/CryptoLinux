@@ -48,7 +48,7 @@ public struct Cipher: Equatable, Hashable, Codable {
     
     public let async: Bool?
     
-    public let ivGenerate: String?
+    public let ivGenerate: IVGenerate?
     
     public let blockSize: UInt?
     

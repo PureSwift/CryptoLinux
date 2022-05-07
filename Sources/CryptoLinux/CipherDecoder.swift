@@ -75,6 +75,9 @@ internal struct CipherDecoder {
                 result[entryIndex][key] = value
             }
         }
+        if let last = result.last, last.isEmpty {
+            result.removeLast()
+        }
         return result
     }
 }

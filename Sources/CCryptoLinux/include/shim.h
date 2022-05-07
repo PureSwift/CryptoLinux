@@ -1,5 +1,4 @@
 #ifdef __linux__
-#include <if_alg.h>
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
 #include <sys/stat.h>

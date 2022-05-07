@@ -22,14 +22,12 @@ internal func stub(function: StaticString = #function) -> Never {
 
 internal extension SocketOptionLevel {
     
-    @_alwaysEmitIntoClient
-    static var crypto: SocketOptionLevel { stub() }
+    static var crypto: SocketOptionLevel { SocketOptionLevel(rawValue: SOL_ALG) }
 }
 
 internal extension SocketAddressFamily {
     
-    @usableFromInline
-    static var crypto: SocketAddressFamily { stub() }
+    static var crypto: SocketAddressFamily { SocketAddressFamily(rawValue: AF_ALG) }
 }
 
 internal extension SocketDescriptor {

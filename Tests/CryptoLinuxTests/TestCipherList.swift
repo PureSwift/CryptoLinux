@@ -1031,6 +1031,7 @@ enum TestCipherList {
         internal     : no
         type         : kpp
         
+        
         """
     }
     
@@ -2399,6 +2400,7 @@ enum TestCipherList {
         type         : shash
         blocksize    : 64
         digestsize   : 20
+        
         
         """
     }

@@ -36,9 +36,10 @@ internal struct CipherDecoder {
     
     func decode<T: Decodable>(_ type: T.Type, from string: String) throws -> [T] {
         log?("Will decode \(String(reflecting: T.self))")
+        let container = try Self.decode(string)
         // initialize decoder
         let decoder = Decoder(
-            referencing: .string(Substring(string)),
+            referencing: .unkeyed(container),
             userInfo: userInfo,
             log: log
         )
@@ -88,16 +89,17 @@ internal extension CipherDecoder {
         
         let log: ((String) -> ())?
         
-        let container: [[String: Substring]]
+        fileprivate(set) var stack: Stack
         
         // MARK: - Initialization
         
-        fileprivate init(referencing container: [[String: Substring]],
-                         at codingPath: [CodingKey] = [],
-                         userInfo: [CodingUserInfoKey : Any],
-                         log: ((String) -> ())?) {
-            
-            self.container = container
+        fileprivate init(
+            referencing container: Stack.Container,
+            at codingPath: [CodingKey] = [],
+            userInfo: [CodingUserInfoKey : Any],
+            log: ((String) -> ())?
+        ) {
+            self.stack = Stack(container)
             self.codingPath = codingPath
             self.userInfo = userInfo
             self.log = log
@@ -112,17 +114,10 @@ internal extension CipherDecoder {
         
         func unkeyedContainer() throws -> UnkeyedDecodingContainer {
             log?("Requested unkeyed container for path \"\(codingPath.path)\"")
-            let container = self.stack.top
-            switch container {
-            case let .strings(strings):
-                return CipherUnkeyedDecodingContainer(referencing: self, wrapping: strings)
-            case let .string(string):
-                // try to forceably parse string
-                let strings = try decodeUnkeyedContainer(string)
-                self.stack.pop() // replace stack
-                self.stack.push(.strings(strings))
-                return CipherUnkeyedDecodingContainer(referencing: self, wrapping: strings)
+            guard case let .unkeyed(container) = self.stack.top else {
+                throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: codingPath, debugDescription: "Expected keyed container."))
             }
+            return CipherUnkeyedDecodingContainer(referencing: self, wrapping: container)
         }
         
         func singleValueContainer() throws -> SingleValueDecodingContainer {
@@ -136,11 +131,61 @@ internal extension CipherDecoder {
 
 internal extension CipherDecoder.Decoder {
     
+    /// Attempt to decode native value to expected type.
     func unbox <T: CipherRawDecodable> (_ string: Substring, as type: T.Type) throws -> T {
         guard let value = T.init(cipher: string) else {
             throw DecodingError.typeMismatch(type, DecodingError.Context(codingPath: self.codingPath, debugDescription: "Could not parse \(type) from \(string)"))
         }
         return value
+    }
+    
+    /// Attempt to decode native value to expected type.
+    func unboxDecodable <T: Decodable> (_ string: Substring, as type: T.Type) throws -> T {
+        
+        // override for native types
+        if type == UUID.self {
+            return try unboxUUID(string) as! T
+        } else if type == Date.self {
+            return try unboxDate(string) as! T
+        } else {
+            // push container to stack and decode using Decodable implementation
+            stack.push(.single(string))
+            let decoded = try T(from: self)
+            stack.pop()
+            return decoded
+        }
+    }
+    
+    /// Attempt to decode native value to expected type.
+    func unboxDecodable <T: Decodable> (_ container: [String: Substring], as type: T.Type) throws -> T {
+        // push container to stack and decode using Decodable implementation
+        stack.push(.keyed(container))
+        let decoded = try T(from: self)
+        stack.pop()
+        return decoded
+    }
+}
+
+private extension CipherDecoder.Decoder {
+    
+    func unboxUUID(_ string: Substring) throws -> UUID {
+        guard let uuid = UUID(uuidString: String(string)) else {
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: codingPath, debugDescription: "Invalid UUID string \(string)"))
+        }
+        return uuid
+    }
+    
+    func unboxDate(_ string: Substring) throws -> Date {
+        // TODO: Date formatting options
+        let formatter = DateFormatter()
+        return try unboxDate(String(string), using: formatter)
+    }
+    
+    func unboxDate(_ string: String, using formatter: DateFormatter) throws -> Date {
+        guard let date = formatter.date(from: string) else {
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: codingPath, debugDescription: "Invalid Date string \(string)"))
+        }
+        return date
     }
 }
 
@@ -179,8 +224,9 @@ internal extension CipherDecoder.Stack {
     
     enum Container {
         
-        case strings([Substring])
-        case string(Substring)
+        case unkeyed([[String: Substring]])
+        case keyed([String: Substring])
+        case single(Substring)
     }
 }
 
@@ -196,7 +242,7 @@ internal struct CipherKeyedDecodingContainer <K: CodingKey> : KeyedDecodingConta
     let decoder: CipherDecoder.Decoder
     
     /// A reference to the container we're reading from.
-    let container: [Substring]
+    let container: [String: Substring]
     
     /// The path of coding keys taken to get to this point in decoding.
     let codingPath: [CodingKey]
@@ -207,22 +253,21 @@ internal struct CipherKeyedDecodingContainer <K: CodingKey> : KeyedDecodingConta
     // MARK: Initialization
     
     /// Initializes `self` by referencing the given decoder and container.
-    init(referencing decoder: CipherDecoder.Decoder, wrapping container: [Substring]) {
-        
+    init(
+        referencing decoder: CipherDecoder.Decoder,
+        wrapping container: [String: Substring]
+    ) {
         self.decoder = decoder
         self.container = container
         self.codingPath = decoder.codingPath
-        self.allKeys = container.compactMap { Key(intValue: Int($0.type.rawValue)) }
+        self.allKeys = container.keys.compactMap { Key(stringValue: $0) }
     }
     
     // MARK: KeyedDecodingContainerProtocol
     
     func contains(_ key: Key) -> Bool {
-        
         self.decoder.log?("Check whether key \"\(key.stringValue)\" exists")
-        guard let typeCode = try? self.decoder.typeCode(for: key)
-            else { return false }
-        return container.contains { $0.type == typeCode }
+        return container.keys.contains(key.stringValue)
     }
     
     func decodeNil(forKey key: Key) throws -> Bool {
@@ -239,82 +284,65 @@ internal struct CipherKeyedDecodingContainer <K: CodingKey> : KeyedDecodingConta
     }
     
     func decode(_ type: Bool.Type, forKey key: Key) throws -> Bool {
-        
-        return try decodeCipher(type, forKey: key)
+        return try decodeRaw(type, forKey: key)
     }
     
     func decode(_ type: Int.Type, forKey key: Key) throws -> Int {
-        
-        let value = try decodeNumeric(Int32.self, forKey: key)
-        return Int(value)
+        return try decodeRaw(type, forKey: key)
     }
     
     func decode(_ type: Int8.Type, forKey key: Key) throws -> Int8 {
-        
-        return try decodeCipher(type, forKey: key)
+        return try decodeRaw(type, forKey: key)
     }
     
     func decode(_ type: Int16.Type, forKey key: Key) throws -> Int16 {
-        
-        return try decodeNumeric(type, forKey: key)
+        return try decodeRaw(type, forKey: key)
     }
     
     func decode(_ type: Int32.Type, forKey key: Key) throws -> Int32 {
-        
-        return try decodeNumeric(type, forKey: key)
+        return try decodeRaw(type, forKey: key)
     }
     
     func decode(_ type: Int64.Type, forKey key: Key) throws -> Int64 {
-        
-        return try decodeNumeric(type, forKey: key)
+        return try decodeRaw(type, forKey: key)
     }
     
     func decode(_ type: UInt.Type, forKey key: Key) throws -> UInt {
-        
-        let value = try decodeNumeric(UInt32.self, forKey: key)
-        return UInt(value)
+        return try decodeRaw(type, forKey: key)
     }
     
     func decode(_ type: UInt8.Type, forKey key: Key) throws -> UInt8 {
-        
-        return try decodeCipher(type, forKey: key)
+        return try decodeRaw(type, forKey: key)
     }
     
     func decode(_ type: UInt16.Type, forKey key: Key) throws -> UInt16 {
-        
-        return try decodeNumeric(type, forKey: key)
+        return try decodeRaw(type, forKey: key)
     }
     
     func decode(_ type: UInt32.Type, forKey key: Key) throws -> UInt32 {
-        
-        return try decodeNumeric(type, forKey: key)
+        return try decodeRaw(type, forKey: key)
     }
     
     func decode(_ type: UInt64.Type, forKey key: Key) throws -> UInt64 {
-        
-        return try decodeNumeric(type, forKey: key)
+        return try decodeRaw(type, forKey: key)
     }
     
     func decode(_ type: Float.Type, forKey key: Key) throws -> Float {
-        
-        let bitPattern = try decodeNumeric(UInt32.self, forKey: key)
-        return Float(bitPattern: bitPattern)
+        return try decodeRaw(type, forKey: key)
     }
     
     func decode(_ type: Double.Type, forKey key: Key) throws -> Double {
-        
-        let bitPattern = try decodeNumeric(UInt64.self, forKey: key)
-        return Double(bitPattern: bitPattern)
+        return try decodeRaw(type, forKey: key)
     }
     
     func decode(_ type: String.Type, forKey key: Key) throws -> String {
-        
-        return try decodeCipher(type, forKey: key)
+        return try decodeRaw(type, forKey: key)
     }
     
     func decode <T: Decodable> (_ type: T.Type, forKey key: Key) throws -> T {
-        
-        return try self.value(for: key, type: type) { try decoder.unboxDecodable($0, as: type) }
+        return try self.value(for: key, type: type) {
+            try decoder.unboxDecodable($0, as: type)
+        }
     }
     
     func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type, forKey key: Key) throws -> KeyedDecodingContainer<NestedKey> where NestedKey : CodingKey {
@@ -340,14 +368,10 @@ internal struct CipherKeyedDecodingContainer <K: CodingKey> : KeyedDecodingConta
     // MARK: Private Methods
     
     /// Decode native value type from Cipher data.
-    private func decodeCipher <T: CipherRawDecodable> (_ type: T.Type, forKey key: Key) throws -> T {
-        
-        return try self.value(for: key, type: type) { try decoder.unbox($0.value, as: type) }
-    }
-    
-    private func decodeNumeric <T: CipherRawDecodable & FixedWidthInteger> (_ type: T.Type, forKey key: Key) throws -> T {
-        
-        return try self.value(for: key, type: type) { try decoder.unboxNumeric($0.value, as: type) }
+    private func decodeRaw <T: CipherRawDecodable> (_ type: T.Type, forKey key: Key) throws -> T {
+        return try self.value(for: key, type: type) {
+            try decoder.unbox($0, as: type)
+        }
     }
     
     /// Access actual value
@@ -365,8 +389,7 @@ internal struct CipherKeyedDecodingContainer <K: CodingKey> : KeyedDecodingConta
     
     /// Access actual value
     private func value(for key: Key) throws -> Substring? {
-        let typeCode = try self.decoder.typeCode(for: key)
-        return container.first { $0.type == typeCode }
+        return container[key.stringValue]
     }
 }
 
@@ -388,8 +411,10 @@ internal struct CipherSingleValueDecodingContainer: SingleValueDecodingContainer
     // MARK: Initialization
     
     /// Initializes `self` by referencing the given decoder and container.
-    init(referencing decoder: CipherDecoder.Decoder, wrapping container: Substring) {
-        
+    init(
+        referencing decoder: CipherDecoder.Decoder,
+        wrapping container: Substring
+    ) {
         self.decoder = decoder
         self.container = container
         self.codingPath = decoder.codingPath
@@ -398,86 +423,66 @@ internal struct CipherSingleValueDecodingContainer: SingleValueDecodingContainer
     // MARK: SingleValueDecodingContainer
     
     func decodeNil() -> Bool {
-        
-        return container.value.isEmpty
+        return container.isEmpty
     }
     
     func decode(_ type: Bool.Type) throws -> Bool {
-        
-        return try self.decoder.unbox(container.value, as: type)
+        return try self.decoder.unbox(container, as: type)
     }
     
     func decode(_ type: Int.Type) throws -> Int {
-        
-        let value = try self.decoder.unboxNumeric(container.value, as: Int32.self)
-        return Int(value)
+        return try self.decoder.unbox(container, as: type)
     }
     
     func decode(_ type: Int8.Type) throws -> Int8 {
-        
-        return try self.decoder.unbox(container.value, as: type)
+        return try self.decoder.unbox(container, as: type)
     }
     
     func decode(_ type: Int16.Type) throws -> Int16 {
-        
-        return try self.decoder.unboxNumeric(container.value, as: type)
+        return try self.decoder.unbox(container, as: type)
     }
     
     func decode(_ type: Int32.Type) throws -> Int32 {
-        
-        return try self.decoder.unboxNumeric(container.value, as: type)
+        return try self.decoder.unbox(container, as: type)
     }
     
     func decode(_ type: Int64.Type) throws -> Int64 {
-        
-        return try self.decoder.unboxNumeric(container.value, as: type)
+        return try self.decoder.unbox(container, as: type)
     }
     
     func decode(_ type: UInt.Type) throws -> UInt {
-        
-        let value = try self.decoder.unboxNumeric(container.value, as: UInt32.self)
-        return UInt(value)
+        return try self.decoder.unbox(container, as: type)
     }
     
     func decode(_ type: UInt8.Type) throws -> UInt8 {
-        
-        return try self.decoder.unbox(container.value, as: type)
+        return try self.decoder.unbox(container, as: type)
     }
     
     func decode(_ type: UInt16.Type) throws -> UInt16 {
-        
-        return try self.decoder.unboxNumeric(container.value, as: type)
+        return try self.decoder.unbox(container, as: type)
     }
     
     func decode(_ type: UInt32.Type) throws -> UInt32 {
-        
-        return try self.decoder.unboxNumeric(container.value, as: type)
+        return try self.decoder.unbox(container, as: type)
     }
     
     func decode(_ type: UInt64.Type) throws -> UInt64 {
-        
-        return try self.decoder.unboxNumeric(container.value, as: type)
+        return try self.decoder.unbox(container, as: type)
     }
     
     func decode(_ type: Float.Type) throws -> Float {
-        
-        let value = try self.decoder.unboxNumeric(container.value, as: UInt32.self)
-        return Float(bitPattern: value)
+        return try self.decoder.unbox(container, as: type)
     }
     
     func decode(_ type: Double.Type) throws -> Double {
-        
-        let value = try self.decoder.unboxNumeric(container.value, as: UInt64.self)
-        return Double(bitPattern: value)
+        return try self.decoder.unbox(container, as: type)
     }
     
     func decode(_ type: String.Type) throws -> String {
-        
-        return try self.decoder.unbox(container.value, as: type)
+        return try self.decoder.unbox(container, as: type)
     }
     
     func decode <T : Decodable> (_ type: T.Type) throws -> T {
-        
         return try self.decoder.unboxDecodable(container, as: type)
     }
 }
@@ -492,7 +497,7 @@ internal struct CipherUnkeyedDecodingContainer: UnkeyedDecodingContainer {
     let decoder: CipherDecoder.Decoder
     
     /// A reference to the container we're reading from.
-    let container: [Substring]
+    let container: [[String: Substring]]
     
     /// The path of coding keys taken to get to this point in decoding.
     let codingPath: [CodingKey]
@@ -502,7 +507,7 @@ internal struct CipherUnkeyedDecodingContainer: UnkeyedDecodingContainer {
     // MARK: Initialization
     
     /// Initializes `self` by referencing the given decoder and container.
-    init(referencing decoder: CipherDecoder.Decoder, wrapping container: [Substring]) {
+    init(referencing decoder: CipherDecoder.Decoder, wrapping container: [[String: Substring]]) {
         
         self.decoder = decoder
         self.container = container
@@ -563,17 +568,15 @@ internal struct CipherUnkeyedDecodingContainer: UnkeyedDecodingContainer {
     }
     
     mutating func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type) throws -> KeyedDecodingContainer<NestedKey> where NestedKey : CodingKey {
-        
         throw DecodingError.typeMismatch(type, DecodingError.Context(codingPath: codingPath, debugDescription: "Cannot decode \(type)"))
     }
     
     mutating func nestedUnkeyedContainer() throws -> UnkeyedDecodingContainer {
-        
         throw DecodingError.typeMismatch([Any].self, DecodingError.Context(codingPath: codingPath, debugDescription: "Cannot decode unkeyed container."))
     }
     
     mutating func superDecoder() throws -> Decoder {
-        
+        /*
         // set coding key context
         self.decoder.codingPath.append(Index(intValue: currentIndex))
         defer { self.decoder.codingPath.removeLast() }
@@ -591,22 +594,23 @@ internal struct CipherUnkeyedDecodingContainer: UnkeyedDecodingContainer {
         self.currentIndex += 1
         
         // create new decoder
-        let decoder = CipherDecoder.Decoder(referencing: .item(item),
-                                         at: self.decoder.codingPath,
-                                         userInfo: self.decoder.userInfo,
-                                         log: self.decoder.log,
-                                         options: self.decoder.options)
+        let decoder = CipherDecoder.Decoder(
+            referencing: .item(item),
+            at: self.decoder.codingPath,
+            userInfo: self.decoder.userInfo,
+            log: self.decoder.log
+        )
         
         return decoder
+        */
+        fatalError()
     }
     
     // MARK: Private Methods
     
     @inline(__always)
     private func assertNotEnd() throws {
-        
         guard isAtEnd == false else {
-            
             throw DecodingError.valueNotFound(Any?.self, DecodingError.Context(codingPath: self.decoder.codingPath + [Index(intValue: self.currentIndex)], debugDescription: "Unkeyed container is at end."))
         }
     }
@@ -661,5 +665,89 @@ extension Bool: CipherRawDecodable {
         default:
             return nil
         }
+    }
+}
+
+extension UInt8: CipherRawDecodable {
+    
+    init?(cipher string: Substring) {
+        self.init(string)
+    }
+}
+
+extension UInt16: CipherRawDecodable {
+    
+    init?(cipher string: Substring) {
+        self.init(string)
+    }
+}
+
+extension UInt32: CipherRawDecodable {
+    
+    init?(cipher string: Substring) {
+        self.init(string)
+    }
+}
+
+extension UInt64: CipherRawDecodable {
+    
+    init?(cipher string: Substring) {
+        self.init(string)
+    }
+}
+
+extension Int8: CipherRawDecodable {
+    
+    init?(cipher string: Substring) {
+        self.init(string)
+    }
+}
+
+extension Int16: CipherRawDecodable {
+    
+    init?(cipher string: Substring) {
+        self.init(string)
+    }
+}
+
+extension Int32: CipherRawDecodable {
+    
+    init?(cipher string: Substring) {
+        self.init(string)
+    }
+}
+
+extension Int64: CipherRawDecodable {
+    
+    init?(cipher string: Substring) {
+        self.init(string)
+    }
+}
+
+extension Int: CipherRawDecodable {
+    
+    init?(cipher string: Substring) {
+        self.init(string)
+    }
+}
+
+extension UInt: CipherRawDecodable {
+    
+    init?(cipher string: Substring) {
+        self.init(string)
+    }
+}
+
+extension Double: CipherRawDecodable {
+    
+    init?(cipher string: Substring) {
+        self.init(string)
+    }
+}
+
+extension Float: CipherRawDecodable {
+    
+    init?(cipher string: Substring) {
+        self.init(string)
     }
 }

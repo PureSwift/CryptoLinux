@@ -45,5 +45,5 @@ extension Cipher.SelfTest: CustomStringConvertible, CustomDebugStringConvertible
 public extension Cipher.SelfTest {
     
     @_alwaysEmitIntoClient
-    static var none: Cipher.SelfTest { "passed" }
+    static var passed: Cipher.SelfTest { "passed" }
 }

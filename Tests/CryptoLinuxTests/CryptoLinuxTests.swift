@@ -18,7 +18,7 @@ final class CryptoLinuxTests: XCTestCase {
         XCTAssertEqual(crypto.first?.module, "cryptd")
         XCTAssertEqual(crypto.first?.priority, 350)
         XCTAssertEqual(crypto.first?.referenceCount, 2)
-        XCTAssertEqual(crypto.first?.selfTest, "passed")
+        XCTAssertEqual(crypto.first?.selfTest, .passed)
         XCTAssertEqual(crypto.first?.isInternal, true)
         XCTAssertEqual(crypto.first?.async, true)
         XCTAssertEqual(crypto.first?.blockSize, 16)

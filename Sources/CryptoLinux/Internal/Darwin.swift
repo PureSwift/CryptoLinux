@@ -43,6 +43,10 @@ public struct sockaddr_alg {
     }
 }
 
+internal extension MessageFlags {
+    static var more: MessageFlags { stub() }
+}
+
 public extension SocketOptionLevel {
     static var crypto: SocketOptionLevel { SocketOptionLevel(rawValue: SOL_ALG) }
 }

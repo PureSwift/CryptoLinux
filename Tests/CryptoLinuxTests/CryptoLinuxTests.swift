@@ -6,13 +6,13 @@ final class CryptoLinuxTests: XCTestCase {
     #if os(Linux)
     func testLoadDrivers() throws {
         let crypto = try CryptoLinux()
-        XCTAssert(crypto.isEmpty == false)
+        XCTAssert(crypto.count > 1, "\(crypto.count)")
     }
     #endif
     
     func testArm64CipherParsing() throws {
         let crypto = try CryptoLinux(TestCipherList.arm64, log: { print("Decoder:", $0) })
-        XCTAssert(crypto.isEmpty == false)
+        XCTAssert(crypto.count > 1, "\(crypto.count)")
         XCTAssertEqual(crypto.first?.name, "__ecb(aes)")
         XCTAssertEqual(crypto.first?.driver, "cryptd(__ecb-aes-ce)")
         XCTAssertEqual(crypto.first?.module, "cryptd")
@@ -32,5 +32,12 @@ final class CryptoLinuxTests: XCTestCase {
     func testAllwinnerH616CipherParsing() throws {
         let crypto = try CryptoLinux(TestCipherList.allwinnerH616, log: { print("Decoder:", $0) })
         XCTAssert(crypto.isEmpty == false)
+    }
+    
+    func testCipherDecoder() throws {
+        var decoder = CipherDecoder()
+        decoder.log = { print("Decoder:", $0) }
+        let value = try decoder.decode([String: String].self, from: TestCipherList.arm64)
+        XCTAssertEqual(value.count, 90)
     }
 }

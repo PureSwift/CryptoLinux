@@ -5,19 +5,22 @@
 //  Created by Alsey Coleman Miller on 5/6/22.
 //
 
-/// Linux Crypto Cipher Name
-public struct CipherName: RawRepresentable, Equatable, Hashable, Codable {
+public extension Cipher {
     
-    public let rawValue: String
-    
-    public init(rawValue: String) {
-        self.rawValue = rawValue
+    /// Linux Crypto Cipher Name
+    struct Name: RawRepresentable, Equatable, Hashable, Codable {
+        
+        public let rawValue: String
+        
+        public init(rawValue: String) {
+            self.rawValue = rawValue
+        }
     }
 }
 
 // MARK: - ExpressibleByStringLiteral
 
-extension CipherName: ExpressibleByStringLiteral {
+extension Cipher.Name: ExpressibleByStringLiteral {
     
     public init(stringLiteral value: String) {
         self.init(rawValue: value)
@@ -26,7 +29,7 @@ extension CipherName: ExpressibleByStringLiteral {
 
 // MARK: - CustomStringConvertible
 
-extension CipherName: CustomStringConvertible, CustomDebugStringConvertible {
+extension Cipher.Name: CustomStringConvertible, CustomDebugStringConvertible {
     
     public var description: String {
         rawValue
@@ -39,32 +42,32 @@ extension CipherName: CustomStringConvertible, CustomDebugStringConvertible {
 
 // MARK: - Definitions
 
-public extension CipherName {
+public extension Cipher.Name {
     
     @_alwaysEmitIntoClient
-    static var sha1: CipherName { "sha1" }
+    static var sha1: Cipher.Name { "sha1" }
     
     @_alwaysEmitIntoClient
-    static var sha256: CipherName { "sha256" }
+    static var sha256: Cipher.Name { "sha256" }
     
     @_alwaysEmitIntoClient
-    static var sha224: CipherName { "sha224" }
+    static var sha224: Cipher.Name { "sha224" }
     
     @_alwaysEmitIntoClient
-    static var sha384: CipherName { "sha384" }
+    static var sha384: Cipher.Name { "sha384" }
     
     @_alwaysEmitIntoClient
-    static var sha512: CipherName { "sha512" }
+    static var sha512: Cipher.Name { "sha512" }
     
     @_alwaysEmitIntoClient
-    static var sha3_224: CipherName { "sha3-224" }
+    static var sha3_224: Cipher.Name { "sha3-224" }
     
     @_alwaysEmitIntoClient
-    static var sha3_256: CipherName { "sha3-256" }
+    static var sha3_256: Cipher.Name { "sha3-256" }
     
     @_alwaysEmitIntoClient
-    static var sha3_384: CipherName { "sha3-384" }
+    static var sha3_384: Cipher.Name { "sha3-384" }
     
     @_alwaysEmitIntoClient
-    static var sha3_512: CipherName { "sha3-512" }
+    static var sha3_512: Cipher.Name { "sha3-512" }
 }

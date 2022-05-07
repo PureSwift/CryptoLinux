@@ -60,6 +60,9 @@ public extension CipherType {
     static var akCipher: CipherType { "akcipher" }
     
     @_alwaysEmitIntoClient
+    static var ablkcipher: CipherType { "ablkcipher" }
+    
+    @_alwaysEmitIntoClient
     static var skCipher: CipherType { "skcipher" }
     
     @_alwaysEmitIntoClient

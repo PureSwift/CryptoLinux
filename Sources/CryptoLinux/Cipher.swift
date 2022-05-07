@@ -27,11 +27,11 @@ public struct Cipher: Equatable, Hashable, Codable {
         case digestSize = "digestsize"
     }
     
-    public let name: CipherName
+    public let name: Name
     
     public let driver: String
     
-    public let module: String
+    public let module: Module
     
     public let priority: Int
     

@@ -13,7 +13,7 @@ public extension Cipher {
         public let rawValue: String
         
         public init(rawValue: String) {
-            assert(rawValue.utf8.count == 64)
+            assert(rawValue.utf8.count <= 64)
             self.rawValue = rawValue
         }
     }

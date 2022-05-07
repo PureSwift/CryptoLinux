@@ -30,8 +30,12 @@ var package = Package(
         .target(
             name: "CryptoLinux",
             dependencies: [
-                "Socket"
+                "Socket",
+                "CCryptoLinux"
             ]
+        ),
+        .target(
+            name: "CCryptoLinux"
         ),
         .testTarget(
             name: "CryptoLinuxTests",

@@ -11,6 +11,7 @@ public struct CipherType: RawRepresentable, Equatable, Hashable, Codable {
     public let rawValue: String
     
     public init(rawValue: String) {
+        assert(rawValue.utf8.count == 14)
         self.rawValue = rawValue
     }
 }

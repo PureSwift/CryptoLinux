@@ -40,7 +40,7 @@ public struct Cipher: Equatable, Hashable, Codable {
     
     public let referenceCount: UInt
     
-    public let selfTest: String
+    public let selfTest: SelfTest
     
     public let isInternal: Bool
     

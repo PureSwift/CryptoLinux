@@ -275,6 +275,7 @@ internal struct CipherKeyedDecodingContainer <K: CodingKey> : KeyedDecodingConta
         self.container = container
         self.codingPath = decoder.codingPath
         self.allKeys = container.keys.compactMap { Key(stringValue: String($0)) }
+        assert(allKeys.count == container.keys.count, "Expected \(container.keys.count) keys but got \(allKeys.count)")
     }
     
     // MARK: KeyedDecodingContainerProtocol

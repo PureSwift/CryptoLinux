@@ -21,10 +21,13 @@ public struct Cipher: Equatable, Hashable, Codable {
         case blockSize = "blocksize"
         case minKeysize = "min keysize"
         case maxKeysize = "max keysize"
-        case ivSize = "ivsize"
         case chunkSize = "chunksize"
         case walkSize = "walksize"
         case digestSize = "digestsize"
+        case seedSize = "seedsize"
+        case ivSize = "ivsize"
+        case ivGenerate = "geniv"
+        case maxAuthsize = "maxauthsize"
     }
     
     public let name: Name
@@ -45,6 +48,8 @@ public struct Cipher: Equatable, Hashable, Codable {
     
     public let async: Bool?
     
+    public let ivGenerate: String?
+    
     public let blockSize: UInt?
     
     public let minKeysize: UInt?
@@ -58,4 +63,8 @@ public struct Cipher: Equatable, Hashable, Codable {
     public let walkSize: UInt?
     
     public let digestSize: UInt?
+    
+    public let seedSize: UInt?
+    
+    public let maxAuthsize: UInt?
 }

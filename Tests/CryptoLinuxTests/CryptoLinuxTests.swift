@@ -16,14 +16,14 @@ final class CryptoLinuxTests: XCTestCase {
         let crypto = try CryptoLinux()
         XCTAssert(crypto.count > 1, "\(crypto.count)")
     }
-    #endif
-
+    
     func testHash() async throws {
         let messageDigest = MessageDigest(type: "hash", name: "sha256")
         let plainText = Data("123456789".utf8)
         let result = try await messageDigest.hash(plainText)
         XCTAssertEqual(result, Data([]))
     }
+    #endif
     
     func testArm64CipherParsing() throws {
         let crypto = try CryptoLinux(TestCipherList.arm64, log: decoderLog)

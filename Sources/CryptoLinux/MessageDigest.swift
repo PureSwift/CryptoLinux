@@ -20,7 +20,7 @@ public struct MessageDigest {
     public init(
         type: CipherType = "hash",
         name: Cipher.Name
-    ) throws {
+    ) {
         self.type = type
         self.name = name
     }

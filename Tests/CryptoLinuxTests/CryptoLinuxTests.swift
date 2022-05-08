@@ -2,6 +2,14 @@ import XCTest
 @testable import CryptoLinux
 
 final class CryptoLinuxTests: XCTestCase {
+
+    var decoderLog: ((String) -> ())? {
+        #if DEBUG
+        return { print("Decoder:", $0) }
+        #else
+        return nil
+        #endif
+    }
     
     #if os(Linux)
     func testLoadDrivers() throws {
@@ -9,13 +17,12 @@ final class CryptoLinuxTests: XCTestCase {
         XCTAssert(crypto.count > 1, "\(crypto.count)")
     }
     #endif
-    
-    var decoderLog: ((String) -> ())? {
-        #if DEBUG
-        return { print("Decoder:", $0) }
-        #else
-        return nil
-        #endif
+
+    func testHash() async throws {
+        let messageDigest = MessageDigest(type: "hash", name: "sha256")
+        let plainText = Data("123456789".utf8)
+        let result = try await messageDigest.hash(plainText)
+        XCTAssertEqual(result, Data([]))
     }
     
     func testArm64CipherParsing() throws {
